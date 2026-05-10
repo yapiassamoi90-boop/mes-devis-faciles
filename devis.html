@@ -1,0 +1,238 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Devis PRO - Confort Écriture</title>
+    
+    <script data-goatcounter="https://monnouveauprojet.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 10px; 
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); 
+            min-height: 100vh;
+        }
+        
+        .container { 
+            background: white; 
+            padding: 25px; /* Augmenté pour plus d'espace */
+            border-radius: 15px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); 
+            max-width: 700px; /* Élargi de 550px à 700px */
+            margin: auto; 
+        }
+        
+        /* Ajustement spécial pour le PDF pour éviter les bords coupés */
+        .pdf-mode {
+            padding: 40px !important;
+        }
+
+        .header-input { 
+            font-size: 22px; 
+            font-weight: bold; 
+            border: none; 
+            border-bottom: 3px solid #28a745; 
+            width: 100%; 
+            margin-bottom: 20px; 
+            padding: 5px; 
+            text-transform: uppercase; 
+            outline: none; 
+        }
+
+        .table-scroll-container {
+            max-height: 400px; 
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead th { position: sticky; top: 0; background: white; z-index: 10; padding: 8px; font-size: 12px; border-bottom: 2px solid #ddd; }
+        td { padding: 5px; vertical-align: middle; }
+
+        th:nth-child(1), td:nth-child(1) { width: 40%; }
+        th:nth-child(2), td:nth-child(2) { width: 20%; }
+        th:nth-child(3), td:nth-child(3) { width: 15%; }
+        th:nth-child(4), td:nth-child(4) { width: 20%; }
+        th:nth-child(5), td:nth-child(5) { width: 5%; }
+
+        input { font-size: 15px; padding: 10px 5px; width: 100%; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+        
+        .col-desig { border: 2px solid #ffeb3b !important; background-color: #fffde7; }
+        .col-prix { border: 2px solid #f44336 !important; background-color: #ffebee; color: #d32f2f; font-weight: bold; }
+        .col-qte { border: 2px solid #2196f3 !important; background-color: #e3f2fd; color: #1976d2; font-weight: bold; }
+        .col-total { border: 2px solid #8bc34a !important; background-color: #f1f8e9; color: #388e3c; font-weight: bold; text-align: center; }
+
+        .btn { font-size: 18px; padding: 15px; width: 100%; margin-top: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; border: none; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-add { background-color: #28a745; color: white; }
+        .btn-pdf { background-color: #007bff; color: white; margin-top: 15px; }
+        .btn-share { background-color: #ff9800; color: white; }
+        .btn-clear { background-color: #6c757d; color: white; font-size: 14px; padding: 10px; }
+
+        #total-box { font-size: 22px; text-align: center; margin-top: 15px; font-weight: bold; padding: 15px; background: #fff176; border-radius: 10px; border: 3px solid #fbc02d; }
+        .no-pdf { display: table-cell; }
+        .btn-remove { color: #dc3545; font-weight: bold; font-size: 24px; cursor: pointer; border: none; background: none; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="devis-content">
+    <input type="text" id="titre-devis" class="header-input" placeholder="DEVIS DE : (EX: ÉLECTRICITÉ)" oninput="saveData()">
+    
+    <div style="text-align: right; margin-bottom: 15px; font-size: 14px;">
+        Date: <span id="date-actuelle"></span>
+        <span style="font-size: 9px; color: #999; display: block;">H@B</span>
+    </div>
+
+    <div class="table-scroll-container" id="scroll-zone">
+        <table id="table">
+            <thead>
+                <tr>
+                    <th style="color: #fbc02d;">Désign.</th>
+                    <th style="color: #d32f2f;">Prix</th>
+                    <th style="color: #1976d2;">Qté</th>
+                    <th style="color: #388e3c;">Total</th>
+                    <th class="no-pdf"></th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+
+    <button class="btn btn-add" id="btn-add" onclick="addRow()">+ Ajouter une ligne</button>
+
+    <!-- Zone Main d'oeuvre mieux espacée -->
+    <div style="margin-top: 25px; text-align: right; padding-right: 5px;">
+        <label style="font-weight:bold;">Main d'œuvre :</label>
+        <input type="number" id="mo" inputmode="decimal" oninput="calculate()" placeholder="0" style="width: 130px; border: 2px solid #9e9e9e; display: inline-block;">
+    </div>
+
+    <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #eee;">
+        <label style="font-weight:bold;">Émis par :</label>
+        <input type="text" id="emetteur" style="font-size: 18px; font-style: italic; border: none; border-bottom: 1px solid #ccc; width: 100%; outline: none; padding: 5px; background: transparent;" placeholder="Votre nom ou entreprise" oninput="saveData()">
+    </div>
+
+    <div id="total-box">
+        TOTAL GÉNÉRAL : <span id="total-text">0</span> FCFA
+    </div>
+</div>
+
+<div style="max-width: 700px; margin: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+    <button class="btn btn-pdf" onclick="generatePDF()">📥 Télécharger le PDF</button>
+    <button id="btnShare" class="btn btn-share" onclick="partagerDevis()">📤 Partager le devis</button>
+    <button class="btn btn-clear" onclick="clearData()">🗑️ Effacer tout le devis</button>
+</div>
+
+<script>
+document.getElementById('date-actuelle').innerText = new Date().toLocaleDateString();
+
+function addRow(valeurs = null) {
+    let tbody = document.getElementById("table-body");
+    let row = tbody.insertRow();
+    row.innerHTML = `
+        <td><input type="text" class="col-desig" placeholder="..." oninput="saveData()" value="${valeurs ? valeurs.desig : ''}"></td>
+        <td><input type="number" class="col-prix" inputmode="decimal" oninput="calculate()" placeholder="0" value="${valeurs ? valeurs.prix : ''}"></td>
+        <td><input type="number" class="col-qte" inputmode="decimal" oninput="calculate()" placeholder="0" value="${valeurs ? valeurs.qte : ''}"></td>
+        <td><input readonly class="col-total" placeholder="0"></td>
+        <td class="no-pdf"><button class="btn-remove" onclick="removeRow(this)">×</button></td>
+    `;
+    if (!valeurs) calculate();
+}
+
+function removeRow(btn) {
+    btn.closest('tr').remove();
+    calculate();
+}
+
+function calculate() {
+    let totalGeneral = 0;
+    let rows = document.querySelectorAll("#table-body tr");
+    rows.forEach(row => {
+        let inputs = row.getElementsByTagName("input");
+        let ligne = (Number(inputs[1].value) * Number(inputs[2].value)) || 0;
+        inputs[3].value = ligne;
+        totalGeneral += ligne;
+    });
+    totalGeneral += Number(document.getElementById("mo").value) || 0;
+    document.getElementById("total-text").innerText = totalGeneral.toLocaleString();
+    saveData();
+}
+
+function saveData() {
+    const data = {
+        titre: document.getElementById('titre-devis').value,
+        mo: document.getElementById('mo').value,
+        emetteur: document.getElementById('emetteur').value,
+        lignes: Array.from(document.querySelectorAll("#table-body tr")).map(row => {
+            let inputs = row.getElementsByTagName("input");
+            return { desig: inputs[0].value, prix: inputs[1].value, qte: inputs[2].value };
+        })
+    };
+    localStorage.setItem('devis_sauvegarde_pro', JSON.stringify(data));
+}
+
+function loadData() {
+    const saved = localStorage.getItem('devis_sauvegarde_pro');
+    if (saved) {
+        const data = JSON.parse(saved);
+        document.getElementById('titre-devis').value = data.titre || "";
+        document.getElementById('mo').value = data.mo || "";
+        document.getElementById('emetteur').value = data.emetteur || "";
+        document.getElementById("table-body").innerHTML = "";
+        if (data.lignes.length > 0) data.lignes.forEach(l => addRow(l));
+        else addRow();
+    } else addRow();
+    calculate();
+}
+
+function clearData() {
+    if (confirm("Effacer tout ?")) { localStorage.removeItem('devis_sauvegarde_pro'); location.reload(); }
+}
+
+async function partagerDevis() {
+    const titre = document.getElementById('titre-devis').value || "Devis";
+    const total = document.getElementById('total-text').innerText;
+    const texte = `Bonjour, voici le ${titre}. Total : ${total} FCFA.`;
+    if (navigator.share) {
+        try { await navigator.share({ title: titre, text: texte, url: window.location.href }); } catch (err) {}
+    } else alert("Partage non supporté.");
+}
+
+function generatePDF() {
+    const element = document.getElementById('devis-content');
+    const scrollZone = document.getElementById('scroll-zone');
+    const noPdfElements = document.querySelectorAll('.no-pdf, #btn-add');
+    
+    // 1. Appliquer les styles pour le PDF
+    element.classList.add('pdf-mode');
+    noPdfElements.forEach(el => el.style.display = 'none');
+    scrollZone.style.maxHeight = 'none';
+    scrollZone.style.overflowY = 'visible';
+
+    const options = {
+        margin: [10, 10, 10, 10],
+        filename: 'devis.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(options).from(element).save().then(() => {
+        // 2. Remettre les styles normaux après export
+        element.classList.remove('pdf-mode');
+        noPdfElements.forEach(el => el.style.display = '');
+        scrollZone.style.maxHeight = '400px';
+        scrollZone.style.overflowY = 'auto';
+    });
+}
+
+window.onload = loadData;
+</script>
+</body>
+</html>
